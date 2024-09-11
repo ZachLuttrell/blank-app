@@ -56,7 +56,7 @@ def load_model():
 
     # Check if the model file was downloaded
     if os.path.exists(model_file):
-        st.write(f"Model file found at {model_file}. Proceeding to load.")
+        st.write(f"Model configured")
     else:
         st.write(f"Model file not found at {model_file}.")
         return None
