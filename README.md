@@ -46,7 +46,6 @@ If you want to manually download the model file, you can access it here: [Downlo
 
     streamlit_app.py: Main application file for running the Streamlit interface.
     requirements.txt: List of dependencies required to run the application.
-    model/: Directory where the model is stored once downloaded from Google Drive.
     README.md: This file, containing instructions on how to run the application.
 
 ## Model Information
