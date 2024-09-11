@@ -90,7 +90,7 @@ if uploaded_files:
     st.subheader("Settings")
     
     # Thresholding toggle
-    apply_threshold = st.checkbox("Apply Thresholding?")
+    apply_threshold = st.checkbox("Apply Thresholding to Predictions?")
     
     # Show threshold slider if thresholding is selected
     if apply_threshold:
