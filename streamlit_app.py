@@ -142,13 +142,6 @@ def load_model():
     # Download the model from Google Drive
     gdown.download(gdrive_url, model_file, quiet=False)
 
-    # Check if the model file was downloaded
-    if os.path.exists(model_file):
-        st.write(f"Model found.")
-    else:
-        st.write(f"Model file not found at {model_file}.")
-        return None
-
     # Load the Keras model with custom metrics and loss function
     model = tf.keras.models.load_model(model_file, custom_objects={
         'dice_coefficient': dice_coefficient, 
