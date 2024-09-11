@@ -1,1 +1,4 @@
+gdown
+tensorflow
 streamlit
+pillow
