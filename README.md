@@ -66,7 +66,7 @@ To deploy this application yourself (e.g., on Streamlit Cloud or another cloud p
     Expand support for additional imagery formats.
     Further optimization for performance and speed, especially for large image batches.
 
-Contact
+## Contact
 
 Feel free to reach out if you have any questions or suggestions:
 
