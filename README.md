@@ -14,18 +14,18 @@ Features
     Download options for prediction masks and overlay images (under development)
 
 How to run it on your own machine
-1. Clone the repository:
+## 1. Clone the repository:
 
     $ git clone https://github.com/ZachLuttrell/building-footprint-extraction.git
     $ cd building-footprint-extraction
 
-2. Install dependencies
+## 2. Install dependencies
 
 You can install all necessary Python packages by running:
 
     $ pip install -r requirements.txt
 
-3. Run the Streamlit app
+## 3. Run the Streamlit app
 
 After installing the requirements, you can run the app locally with:
 
@@ -45,11 +45,11 @@ Files in the Repository
     model/: Directory where the model is stored once downloaded from Google Drive.
     README.md: This file, containing instructions on how to run the application.
 
-Model Information
+## Model Information
 
 The model used in this application is a UNet architecture with a VGG16 backbone, specifically trained for building footprint extraction from Sentinel-2 imagery. It includes custom metrics like Dice Coefficient and Jaccard Index, along with a weighted binary cross-entropy loss function to handle class imbalance in the training data.
 
-Deployment Instructions
+## Deployment Instructions
 
 To deploy this application yourself (e.g., on Streamlit Cloud or another cloud platform), follow these steps:
 
@@ -60,7 +60,7 @@ To deploy this application yourself (e.g., on Streamlit Cloud or another cloud p
         Connect your GitHub repository and select the streamlit_app.py file as the entry point.
         Streamlit Cloud will handle the rest, and your app will be accessible via a public URL.
 
-Future Improvements
+## Future Improvements
 
     Expand support for additional imagery formats.
     Further optimization for performance and speed, especially for large image batches.
