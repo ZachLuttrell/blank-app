@@ -7,11 +7,11 @@ The live application is hosted on Streamlit Cloud and can be accessed here: [Bui
 
 ## Features
 
-    Upload satellite images (in JPG, PNG, or TIFF format) for processing
-    Obtain prediction masks for building footprints via semantic segmentation
-    Option to threshold the predictions and generate overlays with the original image
-    Batch processing of multiple images
-    Download options for prediction masks and overlay images (under development)
+* Upload satellite images (in JPG, PNG, or TIFF format) for processing
+* Obtain prediction masks for building footprints via semantic segmentation
+* Option to threshold the predictions and generate overlays with the original image
+* Batch processing of multiple images
+* Download options for prediction masks and overlay images (under development)
 
 How to run it on your own machine
 ## 1. Clone the repository:
