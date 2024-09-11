@@ -5,7 +5,7 @@ Application Link
 
 The live application is hosted on Streamlit Cloud and can be accessed here: [Building Footprint Extraction App](https://building-footprint-extraction.streamlit.app/)
 
-Features
+## Features
 
     Upload satellite images (in JPG, PNG, or TIFF format) for processing
     Obtain prediction masks for building footprints via semantic segmentation
