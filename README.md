@@ -1,5 +1,6 @@
 # Building Footprint Extraction Through Semantic Segmentation
 This repository contains all of the code necessary to build and deploy my semantic segmentation application on Streamlit.  
+
 The application can be found here: https://building-footprint-extraction.streamlit.app/
 
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://blank-app-template.streamlit.app/)
