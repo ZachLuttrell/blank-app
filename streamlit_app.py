@@ -46,10 +46,10 @@ def weighted_binary_crossentropy(weights):
 weighted_loss = weighted_binary_crossentropy([0.5355597809300489, 7.530414514976497])
 
 # Google Drive link to the model
-gdrive_url = 'https://drive.google.com/file/d/1MB7DOQq6--oIYF6TWdn7kisjXWnPI1E4'
+gdrive_url = 'https://drive.google.com/uc?export=download&id=1MB7DOQq6--oIYF6TWdn7kisjXWnPI1E4'
 model_file = '/mount/src/building_footprint_extraction/unet_vgg_14.keras'
 
-@st.cache(allow_output_mutation=True)
+@st.cache_resource(allow_output_mutation=True)
 def load_model():
     # Download the model from Google Drive
     gdown.download(gdrive_url, model_file, quiet=False)
