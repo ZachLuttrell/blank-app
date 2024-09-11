@@ -38,7 +38,8 @@ The app will now be accessible in your browser at http://localhost:8501/ by defa
 This app automatically downloads the trained UNet+VGG16 model from Google Drive during runtime. The model file is stored as unet_vgg_14.keras and is required for generating predictions.
 
 If you want to manually download the model file, you can access it here: [Download Model.](https://drive.google.com/file/d/1MB7DOQq6--oIYF6TWdn7kisjXWnPI1E4/view?usp=drive_link)
-Files in the Repository
+
+## Files in the Repository
 
     streamlit_app.py: Main application file for running the Streamlit interface.
     requirements.txt: List of dependencies required to run the application.
