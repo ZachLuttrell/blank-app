@@ -5,7 +5,7 @@ Application Link
 
 The live application is hosted on Streamlit and can be accessed here: [Building Footprint Extraction App](https://building-footprint-extraction.streamlit.app/)
 
-(images/example_output_1.png)
+[Example](images/example_output_1.png)
 
 ## Features
 
