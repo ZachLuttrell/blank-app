@@ -11,7 +11,7 @@ The live application is hosted on Streamlit and can be accessed here: [Building 
 * Obtain prediction masks for building footprints via semantic segmentation
 * Option to threshold the predictions and generate overlays with the original image
 * Batch processing of multiple images
-* Download options for prediction masks and overlay images (under development)
+* Download options for prediction masks and overlay images
 
 How to run it on your own machine
 ## 1. Clone the repository:
