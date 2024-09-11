@@ -14,25 +14,26 @@ Features
     Download options for prediction masks and overlay images (under development)
 
 How to run it on your own machine
-1. Clone the repository
+1. Clone the repository:
 
-$ git clone https://github.com/your-username/building-footprint-extraction.git
-$ cd building-footprint-extraction
+    $ git clone https://github.com/ZachLuttrell/building-footprint-extraction.git
+    $ cd building-footprint-extraction
 
 2. Install dependencies
 
 You can install all necessary Python packages by running:
 
-$ pip install -r requirements.txt
+    $ pip install -r requirements.txt
 
 3. Run the Streamlit app
 
 After installing the requirements, you can run the app locally with:
 
-$ streamlit run streamlit_app.py
+    $ streamlit run streamlit_app.py
 
 The app will now be accessible in your browser at http://localhost:8501/ by default.
-4. Downloading and loading the model
+
+## 4. Downloading and loading the model
 
 This app automatically downloads the trained UNet+VGG16 model from Google Drive during runtime. The model file is stored as unet_vgg_14.keras and is required for generating predictions.
 
