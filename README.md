@@ -1,4 +1,4 @@
-# Building Footprint Extraction Through Semantic Segmentation
+# 🏢🗺️ Building Footprint Extraction Through Semantic Segmentation
 
 This repository contains the code for my semantic segmentation application designed to extract building footprints from Sentinel-2 imagery using a UNet-based model with a VGG16 backbone. This application allows users to upload satellite images, process them using the trained model, and obtain prediction masks, along with optional overlays of the detected building footprints.
 Application Link
