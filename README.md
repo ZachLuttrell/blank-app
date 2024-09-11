@@ -5,6 +5,8 @@ Application Link
 
 The live application is hosted on Streamlit and can be accessed here: [Building Footprint Extraction App](https://building-footprint-extraction.streamlit.app/)
 
+[Example](images/example_output_1.png)
+
 ## Features
 
 * Upload satellite images (in JPG, PNG, or TIFF format) for processing
