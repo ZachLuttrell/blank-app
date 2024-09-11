@@ -7,7 +7,10 @@ The live application is hosted on Streamlit and can be accessed here: [Building 
 
 [Example of Application Output](images/example_output_1.png)
 
+![example_output_1](https://github.com/user-attachments/assets/a32372fb-4356-40e9-b5e7-9106c5ba6d11)
+
 ## Features
+
 
 * Upload satellite images (in JPG, PNG, or TIFF format) for processing
 * Obtain prediction masks for building footprints via semantic segmentation
