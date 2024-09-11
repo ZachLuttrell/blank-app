@@ -3,6 +3,7 @@ from PIL import Image
 import gdown
 import tensorflow as tf
 import numpy as np
+import os
 
 # Custom metric functions
 def dice_coefficient(y_true, y_pred):
@@ -48,11 +49,18 @@ weighted_loss = weighted_binary_crossentropy([0.5355597809300489, 7.530414514976
 gdrive_url = 'https://drive.google.com/file/d/1MB7DOQq6--oIYF6TWdn7kisjXWnPI1E4'
 model_file = '/mount/src/building_footprint_extraction/unet_vgg_14.keras'
 
-# Function to load the model from Google Drive with custom objects
 @st.cache(allow_output_mutation=True)
 def load_model():
     # Download the model from Google Drive
     gdown.download(gdrive_url, model_file, quiet=False)
+
+    # Check if the model file was downloaded
+    if os.path.exists(model_file):
+        st.write(f"Model file found at {model_file}. Proceeding to load.")
+    else:
+        st.write(f"Model file not found at {model_file}.")
+        return None
+
     # Load the Keras model with custom metrics and loss function
     model = tf.keras.models.load_model(model_file, custom_objects={
         'dice_coefficient': dice_coefficient, 
