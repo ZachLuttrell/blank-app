@@ -2,7 +2,7 @@ import streamlit as st
 from PIL import Image
 
 # Title and description
-st.title("Building Footprint Extractor")
+st.title("Building Footprint Extractor ---")
 st.write("Upload Sentinel 2 satellite imagery to automatically extract building footprints through semantic segmentation.")
 
 # Section 1: Imagery Upload
