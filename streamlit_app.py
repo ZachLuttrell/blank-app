@@ -4,6 +4,7 @@ import gdown
 import tensorflow as tf
 import numpy as np
 import os
+from io import BytesIO
 
 # Processing Functions
 # Function to break an image into patches
@@ -63,6 +64,34 @@ def reassemble_patches(patches, original_shape, patch_size=256, overlap=32):
     reassembled_image /= count
 
     return reassembled_image
+
+# Helper function to create a downloadable link
+def get_image_download_link(img, filename, text):
+    buffered = BytesIO()
+    img.save(buffered, format="JPEG")  # Save as JPEG or another format
+    img_str = buffered.getvalue()
+    st.download_button(
+        label=text,
+        data=img_str,
+        file_name=filename,
+        mime="image/jpeg"
+    )
+
+# Section for download buttons
+def create_download_options(prediction_image, overlay_image, image_filename, overlay_option):
+    st.subheader("Download Options")
+    download_options = st.multiselect(
+        "Select what you would like to download:",
+        ["Masks (JPG)", "Overlays (JPG)" if overlay_option else None]  # Only show overlay option if selected
+    )
+    
+    if "Masks (JPG)" in download_options:
+        # Create a download button for the mask
+        get_image_download_link(prediction_image, f"prediction_{image_filename}.jpg", "Download Prediction Mask")
+
+    if "Overlays (JPG)" in download_options and overlay_option:
+        # Create a download button for the overlay
+        get_image_download_link(overlay_image, f"overlay_{image_filename}.jpg", "Download Overlay Image")
 
 # CUSTOM METRICS AND LOSS FUNCTIONS
 def dice_coefficient(y_true, y_pred):
@@ -155,6 +184,9 @@ def process_image(image):
     
     return full_mask
 
+processed_images = []
+processed_overlays = []
+
 if uploaded_files:
     st.write(f"{len(uploaded_files)} image(s) uploaded successfully!")
 
@@ -174,6 +206,7 @@ if uploaded_files:
         # Loop through each uploaded file
         for idx, uploaded_file in enumerate(uploaded_files):
             image = Image.open(uploaded_file)
+            image_filename = os.path.splitext(uploaded_file.name)[0]  # Get filename without extension
 
             # Process the image and get the prediction
             st.write(f"Processing {uploaded_file.name}...")
@@ -185,6 +218,9 @@ if uploaded_files:
 
             # Convert prediction mask to image format (PIL)
             prediction_image = Image.fromarray((prediction_mask * 255).astype(np.uint8))
+
+            # Store the prediction image for downloading later
+            processed_images.append((prediction_image, f"prediction_{image_filename}.jpg"))
 
             # Display results (original, prediction, and overlay if selected)
             if overlay_option:
@@ -200,21 +236,29 @@ if uploaded_files:
             with col2:
                 st.image(prediction_image, caption="Prediction", use_column_width=True)
 
-            # Display overlay if selected
+            # Display and store overlay if selected
             if overlay_option:
                 overlay_image = Image.blend(image.convert("RGBA"), prediction_image.convert("RGBA"), alpha=0.5)
+                processed_overlays.append((overlay_image, f"overlay_{image_filename}.jpg"))
                 with col3:
                     st.image(overlay_image, caption="Prediction Overlay", use_column_width=True)
 
             # Update progress bar
             progress_bar.progress((idx + 1) / total_images)
 
-        # Download options
+        # Now, allow the user to download the results
         st.subheader("Download Options")
         download_options = st.multiselect(
             "Select what you would like to download:",
             ["Masks (JPG)", "Overlays (JPG)" if overlay_option else None]
         )
 
+        # Create download buttons for each selected option
         if st.button("Download"):
-            st.write(f"Preparing {', '.join(download_options)} for download... (Functionality Coming Soon)")
+            if "Masks (JPG)" in download_options:
+                for image, filename in processed_images:
+                    get_image_download_link(image, filename, f"Download {filename}")
+
+            if "Overlays (JPG)" in download_options and overlay_option:
+                for overlay, filename in processed_overlays:
+                    get_image_download_link(overlay, filename, f"Download {filename}")
