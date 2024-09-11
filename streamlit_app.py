@@ -5,7 +5,66 @@ import tensorflow as tf
 import numpy as np
 import os
 
-# Custom metric functions
+# Processing Functions
+# Function to break an image into patches
+def image_to_patches(image, patch_size=256, overlap=32):
+    patches = []
+    step = patch_size - overlap
+    x_max = image.shape[0] - patch_size
+    y_max = image.shape[1] - patch_size
+
+    for x in range(0, x_max + 1, step):
+        for y in range(0, y_max + 1, step):
+            patch = image[x:x + patch_size, y:y + patch_size]
+            patches.append(patch)
+
+    # Edge patches (right and bottom)
+    if x_max % step != 0:
+        for y in range(0, y_max + 1, step):
+            patch = image[x_max:x_max + patch_size, y:y + patch_size]
+            patches.append(patch)
+    if y_max % step != 0:
+        for x in range(0, x_max + 1, step):
+            patch = image[x:x + patch_size, y_max:y_max + patch_size]
+            patches.append(patch)
+    if x_max % step != 0 or y_max % step != 0:
+        patch = image[x_max:x_max + patch_size, y_max:y_max + patch_size]
+        patches.append(patch)
+
+    return patches
+
+# Function to predict on patches
+def predict_patches(model, patches):
+    predictions = []
+    for patch in patches:
+        patch = np.expand_dims(patch, axis=0)  # Add batch dimension
+        prediction = model.predict(patch, verbose=0)
+        predictions.append(prediction.squeeze())  # Remove batch dimension
+    return predictions
+
+# Function to reassemble patches into the full image
+def reassemble_patches(patches, original_shape, patch_size=256, overlap=32):
+    step = patch_size - overlap
+    image_height, image_width = original_shape[:2]
+    reassembled_image = np.zeros(original_shape[:2])
+
+    # Create an accumulator image to count the number of predictions per pixel
+    count = np.zeros(original_shape[:2])
+
+    patch_idx = 0
+    for x in range(0, image_height - patch_size + 1, step):
+        for y in range(0, image_width - patch_size + 1, step):
+            reassembled_image[x:x + patch_size, y:y + patch_size] += patches[patch_idx]
+            count[x:x + patch_size, y:y + patch_size] += 1
+            patch_idx += 1
+
+    # Normalize by the number of patches overlapping at each pixel
+    count[count == 0] = 1  # Avoid division by zero
+    reassembled_image /= count
+
+    return reassembled_image
+
+# CUSTOM METRICS AND LOSS FUNCTIONS
 def dice_coefficient(y_true, y_pred):
     y_true_f = tf.reshape(y_true, [-1])
     y_pred_f = tf.reshape(y_pred, [-1])
@@ -83,53 +142,51 @@ st.write("Upload Sentinel 2 satellite imagery to automatically extract building 
 st.subheader("Imagery")
 uploaded_files = st.file_uploader("Choose image(s)...", type=["jpg", "png", "tiff"], accept_multiple_files=True)
 
+# Function to process each image
+def process_image(image):
+    image_array = np.array(image) / 255.0  # Normalize the image
+    patches = image_to_patches(image_array)  # Convert image into patches
+
+    # Predict on the patches
+    predictions = predict_patches(model, patches)
+
+    # Reassemble the patches into a full prediction mask
+    full_mask = reassemble_patches(predictions, image_array.shape)
+    
+    return full_mask
+
 if uploaded_files:
     st.write(f"{len(uploaded_files)} image(s) uploaded successfully!")
-    
+
     # Section 2: Settings
     st.subheader("Settings")
     
-    # Thresholding toggle
-    apply_threshold = st.checkbox("Apply Thresholding to Predictions?")
-    
-    # Show threshold slider if thresholding is selected
-    if apply_threshold:
-        threshold_value = st.slider("Select Threshold Value:", 0.0, 0.99, 0.5)
-        st.write(f"Thresholding Enabled. Value: {threshold_value}")
-    else:
-        st.write("Thresholding Disabled.")
-    
-    # Overlay option
+    apply_threshold = st.checkbox("Apply Thresholding?")
+    threshold_value = st.slider("Select Threshold Value:", 0.0, 0.99, 0.5) if apply_threshold else None
     overlay_option = st.checkbox("Create Additional Overlay Imagery?")
-
-    # Process button
+    
     if st.button("Process Imagery"):
         st.subheader("Results")
-        st.write("Processing...")
+
+        progress_bar = st.progress(0)
+        total_images = len(uploaded_files)
 
         # Loop through each uploaded file
-        for uploaded_file in uploaded_files:
-            # Read the uploaded file as an image
+        for idx, uploaded_file in enumerate(uploaded_files):
             image = Image.open(uploaded_file)
 
-            # Convert image to numpy array for model input
-            image_array = np.array(image)
-            image_array = np.expand_dims(image_array, axis=0)  # Add batch dimension
-
-            # Normalize image
-            image_array = image_array / 255.0
-
-            # Get model prediction
-            prediction = model.predict(image_array)[0]
+            # Process the image and get the prediction
+            st.write(f"Processing {uploaded_file.name}...")
+            prediction_mask = process_image(image)
 
             # Apply threshold if selected
             if apply_threshold:
-                prediction = (prediction > threshold_value).astype(np.uint8)
+                prediction_mask = (prediction_mask > threshold_value).astype(np.uint8)
 
-            # Convert prediction to image format (PIL)
-            prediction_image = Image.fromarray((prediction * 255).astype(np.uint8))
+            # Convert prediction mask to image format (PIL)
+            prediction_image = Image.fromarray((prediction_mask * 255).astype(np.uint8))
 
-            # Display results side by side (original, prediction, and overlay if selected)
+            # Display results (original, prediction, and overlay if selected)
             if overlay_option:
                 col1, col2, col3 = st.columns(3)
             else:
@@ -143,18 +200,20 @@ if uploaded_files:
             with col2:
                 st.image(prediction_image, caption="Prediction", use_column_width=True)
 
-            # Display overlay if option is selected
+            # Display overlay if selected
             if overlay_option:
-                # Create overlay
                 overlay_image = Image.blend(image.convert("RGBA"), prediction_image.convert("RGBA"), alpha=0.5)
                 with col3:
                     st.image(overlay_image, caption="Prediction Overlay", use_column_width=True)
+
+            # Update progress bar
+            progress_bar.progress((idx + 1) / total_images)
 
         # Download options
         st.subheader("Download Options")
         download_options = st.multiselect(
             "Select what you would like to download:",
-            ["Masks (JPG)", "Overlays (JPG)" if overlay_option else None]  # Only show overlay option if selected
+            ["Masks (JPG)", "Overlays (JPG)" if overlay_option else None]
         )
 
         if st.button("Download"):
