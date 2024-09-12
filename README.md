@@ -4,7 +4,7 @@ This repository contains the code for my semantic segmentation application desig
 
 The live application is hosted on Streamlit and can be accessed here: [Building Footprint Extraction App](https://building-footprint-extraction.streamlit.app/)
 
-More information on the project of training the model can be found here: [Model Repository](https://github.com/ZachLuttrell/UCSD_Capstone)
+More information on the training of the model can be found here: [Model Repository](https://github.com/ZachLuttrell/UCSD_Capstone)
 
 ![example_output_1](https://github.com/user-attachments/assets/a32372fb-4356-40e9-b5e7-9106c5ba6d11)
 
