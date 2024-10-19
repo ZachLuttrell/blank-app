@@ -167,6 +167,9 @@ uploaded_files = st.file_uploader("Choose image(s)...", type=["jpg", "png", "tif
 # Function to process each image
 def process_image(image):
     image_array = np.array(image) / 255.0  # Normalize the image
+    if image_array.shape[-1] == 4:
+        image_array = image_array[..., :3]
+
     patches = image_to_patches(image_array)  # Convert image into patches
 
     # Predict on the patches
@@ -198,7 +201,7 @@ if uploaded_files:
 
         # Loop through each uploaded file
         for idx, uploaded_file in enumerate(uploaded_files):
-            image = Image.open(uploaded_file)
+            image = Image.open(uploaded_file).convert("RGB")
             image_filename = os.path.splitext(uploaded_file.name)[0]  # Get filename without extension
 
             # Process the image and get the prediction
