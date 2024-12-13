@@ -7,7 +7,6 @@ import os
 from io import BytesIO
 
 # Processing Functions
-# Function to break an image into patches
 def image_to_patches(image, patch_size=256, overlap=32):
     patches = []
     step = patch_size - overlap
@@ -26,7 +25,7 @@ def image_to_patches(image, patch_size=256, overlap=32):
             patches.append(patch)
     if y_max % step != 0:
         for x in range(0, x_max + 1, step):
-            patch = image[x:x + patch_size, y_max:y_max + patch_size]
+            patch = image[x:x + patch_size, y:y + patch_size]
             patches.append(patch)
     if x_max % step != 0 or y_max % step != 0:
         patch = image[x_max:x_max + patch_size, y_max:y_max + patch_size]
@@ -34,7 +33,6 @@ def image_to_patches(image, patch_size=256, overlap=32):
 
     return patches
 
-# Function to predict on patches
 def predict_patches(model, patches):
     predictions = []
     for patch in patches:
@@ -43,13 +41,10 @@ def predict_patches(model, patches):
         predictions.append(prediction.squeeze())  # Remove batch dimension
     return predictions
 
-# Function to reassemble patches into the full image
 def reassemble_patches(patches, original_shape, patch_size=256, overlap=32):
     step = patch_size - overlap
     image_height, image_width = original_shape[:2]
     reassembled_image = np.zeros(original_shape[:2])
-
-    # Create an accumulator image to count the number of predictions per pixel
     count = np.zeros(original_shape[:2])
 
     patch_idx = 0
@@ -59,13 +54,10 @@ def reassemble_patches(patches, original_shape, patch_size=256, overlap=32):
             count[x:x + patch_size, y:y + patch_size] += 1
             patch_idx += 1
 
-    # Normalize by the number of patches overlapping at each pixel
     count[count == 0] = 1  # Avoid division by zero
     reassembled_image /= count
-
     return reassembled_image
 
-# Helper function to create a downloadable link
 def get_image_download_link(img, filename, text):
     buffered = BytesIO()
     img.save(buffered, format="JPEG")  # Save as JPEG or another format
@@ -77,20 +69,17 @@ def get_image_download_link(img, filename, text):
         mime="image/jpeg"
     )
 
-# Section for download buttons
 def create_download_options(prediction_image, overlay_image, image_filename, overlay_option):
     st.subheader("Download Options")
     download_options = st.multiselect(
         "Select what you would like to download:",
-        ["Masks (JPG)", "Overlays (JPG)" if overlay_option else None]  # Only show overlay option if selected
+        ["Masks (JPG)", "Overlays (JPG)" if overlay_option else None]
     )
     
     if "Masks (JPG)" in download_options:
-        # Create a download button for the mask
         get_image_download_link(prediction_image, f"prediction_{image_filename}.jpg", "Download Prediction Mask")
 
     if "Overlays (JPG)" in download_options and overlay_option:
-        # Create a download button for the overlay
         get_image_download_link(overlay_image, f"overlay_{image_filename}.jpg", "Download Overlay Image")
 
 # CUSTOM METRICS AND LOSS FUNCTIONS
@@ -122,7 +111,6 @@ def precision(y_true, y_pred):
     predicted_positives = tf.reduce_sum(tf.round(tf.clip_by_value(y_pred, 0, 1)))
     return true_positives / (predicted_positives + tf.keras.backend.epsilon())
 
-# Custom weighted binary crossentropy loss function
 def weighted_binary_crossentropy(weights):
     def loss(y_true, y_pred):
         bce = tf.keras.backend.binary_crossentropy(y_true, y_pred)
@@ -130,19 +118,14 @@ def weighted_binary_crossentropy(weights):
         return tf.keras.backend.mean(weighted_bce)
     return loss
 
-# Define the weights for the custom loss function
 weighted_loss = weighted_binary_crossentropy([0.5355597809300489, 7.530414514976497])
 
-# Google Drive link to the model
 gdrive_url = 'https://drive.google.com/uc?export=download&id=1MB7DOQq6--oIYF6TWdn7kisjXWnPI1E4'
 model_file = '/mount/src/building_footprint_extraction/unet_vgg_14.keras'
 
 @st.cache(allow_output_mutation=True)
 def load_model():
-    # Download the model from Google Drive
     gdown.download(gdrive_url, model_file, quiet=False)
-
-    # Load the Keras model with custom metrics and loss function
     model = tf.keras.models.load_model(model_file, custom_objects={
         'dice_coefficient': dice_coefficient, 
         'jaccard_index': jaccard_index, 
@@ -153,108 +136,110 @@ def load_model():
     })
     return model
 
-# Load the model
 model = load_model()
 
 # Title and description
 st.title("Building Footprint Extractor")
-st.write("Upload Sentinel 2 satellite imagery to automatically extract building footprints through semantic segmentation.")
+st.write("Upload Sentinel 2 imagery to extract building footprints.")
 
-# Section 1: Imagery Upload
-st.subheader("Imagery")
-uploaded_files = st.file_uploader("Choose image(s)...", type=["jpg", "png", "tiff"], accept_multiple_files=True)
+st.markdown("### Step 1: Upload Your Imagery")
+uploaded_files = st.file_uploader("Choose image(s)", type=["jpg", "png", "tiff"], accept_multiple_files=True)
 
-# Function to process each image
-def process_image(image):
-    image_array = np.array(image) / 255.0  # Normalize the image
-    if image_array.shape[-1] == 4:
-        image_array = image_array[..., :3]
-
-    patches = image_to_patches(image_array)  # Convert image into patches
-
-    # Predict on the patches
-    predictions = predict_patches(model, patches)
-
-    # Reassemble the patches into a full prediction mask
-    full_mask = reassemble_patches(predictions, image_array.shape)
-    
-    return full_mask
-
-processed_images = []
-processed_overlays = []
+# Variables to store raw predictions and images for post-processing
+raw_predictions = []
+original_images = []
+image_filenames = []
 
 if uploaded_files:
-    st.write(f"{len(uploaded_files)} image(s) uploaded successfully!")
+    st.write(f"**{len(uploaded_files)} image(s) uploaded successfully!**")
 
-    # Section 2: Settings
-    st.subheader("Settings")
-    
-    apply_threshold = st.checkbox("Apply Thresholding?")
-    threshold_value = st.slider("Select Threshold Value:", 0.0, 0.99, 0.5) if apply_threshold else None
-    overlay_option = st.checkbox("Create Additional Overlay Imagery?")
-    
+    # Process Imagery Button
     if st.button("Process Imagery"):
-        st.subheader("Results")
-
+        st.markdown("### Step 2: Initial Results")
         progress_bar = st.progress(0)
         total_images = len(uploaded_files)
 
-        # Loop through each uploaded file
+        # Process each image with no thresholding or overlays initially
         for idx, uploaded_file in enumerate(uploaded_files):
             image = Image.open(uploaded_file).convert("RGB")
-            image_filename = os.path.splitext(uploaded_file.name)[0]  # Get filename without extension
+            image_filename = os.path.splitext(uploaded_file.name)[0]
+            image_array = np.array(image) / 255.0
+            if image_array.shape[-1] == 4:
+                image_array = image_array[..., :3]
 
-            # Process the image and get the prediction
-            st.write(f"Processing {uploaded_file.name}...")
-            prediction_mask = process_image(image)
+            # Run predictions without threshold or overlays
+            patches = image_to_patches(image_array)
+            predictions = predict_patches(model, patches)
+            full_mask = reassemble_patches(predictions, image_array.shape)
 
-            # Apply threshold if selected
-            if apply_threshold:
-                prediction_mask = (prediction_mask > threshold_value).astype(np.uint8)
+            raw_predictions.append(full_mask)  # Store raw predictions
+            original_images.append(image)
+            image_filenames.append(image_filename)
 
-            # Convert prediction mask to image format (PIL)
-            prediction_image = Image.fromarray((prediction_mask * 255).astype(np.uint8))
+            # Display raw prediction as is (no threshold applied)
+            prediction_image = Image.fromarray((full_mask * 255).astype(np.uint8))
 
-            # Store the prediction image for downloading later
-            processed_images.append((prediction_image, f"prediction_{image_filename}.jpg"))
-
-            # Display results (original, prediction, and overlay if selected)
-            if overlay_option:
-                col1, col2, col3 = st.columns(3)
-            else:
-                col1, col2 = st.columns(2)
-
-            # Display original image
+            col1, col2 = st.columns(2)
             with col1:
                 st.image(image, caption="Original", use_column_width=True)
-
-            # Display prediction image
             with col2:
-                st.image(prediction_image, caption="Prediction", use_column_width=True)
+                st.image(prediction_image, caption="Raw Prediction", use_column_width=True)
 
-            # Display and store overlay if selected
-            if overlay_option:
-                overlay_image = Image.blend(image.convert("RGBA"), prediction_image.convert("RGBA"), alpha=0.5)
-                processed_overlays.append((overlay_image, f"overlay_{image_filename}.jpg"))
-                with col3:
-                    st.image(overlay_image, caption="Prediction Overlay", use_column_width=True)
-
-            # Update progress bar
             progress_bar.progress((idx + 1) / total_images)
 
-        # Now, allow the user to download the results
-        st.subheader("Download Options")
-        download_options = st.multiselect(
-            "Select what you would like to download:",
-            ["Masks (JPG)", "Overlays (JPG)" if overlay_option else None]
-        )
+        # After showing initial results, show the post-processing expander
+        st.divider()
+        st.markdown("### Step 3: Refine Results")
+        with st.expander("Adjust Post-Processing Settings"):
+            apply_threshold = st.checkbox("Apply Thresholding?")
+            threshold_value = st.slider("Select Threshold Value:", 0.0, 0.99, 0.5) if apply_threshold else None
+            overlay_option = st.checkbox("Create Overlay Imagery?")
 
-        # Create download buttons for each selected option
-        if st.button("Download"):
-            if "Masks (JPG)" in download_options:
-                for image, filename in processed_images:
-                    get_image_download_link(image, filename, f"Download {filename}")
+            if st.button("Apply Refinements"):
+                st.subheader("Refined Results")
+                processed_images = []
+                processed_overlays = []
 
-            if "Overlays (JPG)" in download_options and overlay_option:
-                for overlay, filename in processed_overlays:
-                    get_image_download_link(overlay, filename, f"Download {filename}")
+                for idx, (full_mask, image, image_filename) in enumerate(zip(raw_predictions, original_images, image_filenames)):
+                    # Apply threshold if selected
+                    if apply_threshold:
+                        mask = (full_mask > threshold_value).astype(np.uint8)
+                    else:
+                        mask = (full_mask * 255).astype(np.uint8) / 255.0
+                        mask = (mask > 0.5).astype(np.uint8)  # simple binarization if needed
+                        
+                    prediction_image = Image.fromarray((mask * 255).astype(np.uint8))
+                    if overlay_option:
+                        overlay_image = Image.blend(image.convert("RGBA"), prediction_image.convert("RGBA"), alpha=0.5)
+                    else:
+                        overlay_image = None
+
+                    col1, col2 = st.columns(2) if not overlay_option else st.columns(3)
+                    with col1:
+                        st.image(image, caption=f"{image_filename} - Original", use_column_width=True)
+                    with col2:
+                        st.image(prediction_image, caption="Refined Mask", use_column_width=True)
+                    if overlay_option and overlay_image:
+                        with col2 if not overlay_option else col3:  # Adjust if you have a third column
+                            st.image(overlay_image, caption="Refined Overlay", use_column_width=True)
+
+                    processed_images.append((prediction_image, f"prediction_{image_filename}.jpg"))
+                    if overlay_option and overlay_image:
+                        processed_overlays.append((overlay_image, f"overlay_{image_filename}.jpg"))
+
+                # Download options after refinements
+                st.divider()
+                st.subheader("Download Options")
+                download_options = st.multiselect(
+                    "Select what you would like to download:",
+                    ["Masks (JPG)", "Overlays (JPG)" if overlay_option else None]
+                )
+
+                if st.button("Download"):
+                    if "Masks (JPG)" in download_options:
+                        for image, filename in processed_images:
+                            get_image_download_link(image, filename, f"Download {filename}")
+
+                    if "Overlays (JPG)" in download_options and overlay_option:
+                        for overlay, filename in processed_overlays:
+                            get_image_download_link(overlay, filename, f"Download {filename}")
