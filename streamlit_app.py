@@ -7,9 +7,38 @@ import os
 from io import BytesIO
 import zipfile
 
-# ---------------------------
-# Utility Functions
-# ---------------------------
+# ------------------------------------------------------
+# 1. Global Page Configuration and Custom CSS
+# ------------------------------------------------------
+st.set_page_config(
+    page_title="Building Footprint Extractor",
+    page_icon="🏗️",
+    layout="wide"
+)
+
+# Inject custom CSS for a polished look.
+st.markdown(
+    """
+    <style>
+    /* Custom background for the main area and sidebar */
+    .main {
+        background-color: #f9f9f9;
+    }
+    .sidebar .sidebar-content {
+        background-color: #f0f0f0;
+    }
+    /* Header styles */
+    h1, h2, h3, h4, h5 {
+        color: #2c3e50;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# ------------------------------------------------------
+# 2. Utility Functions
+# ------------------------------------------------------
 def image_to_patches(image, patch_size=256, overlap=32):
     """
     Splits the input image into overlapping patches, ensuring full coverage.
@@ -24,13 +53,11 @@ def image_to_patches(image, patch_size=256, overlap=32):
 
     # Compute the starting x positions.
     x_positions = list(range(0, height - patch_size + 1, step))
-    # If the last patch does not reach the bottom, add an extra position.
     if not x_positions or x_positions[-1] != height - patch_size:
         x_positions.append(height - patch_size)
 
     # Compute the starting y positions.
     y_positions = list(range(0, width - patch_size + 1, step))
-    # If the last patch does not reach the right edge, add an extra position.
     if not y_positions or y_positions[-1] != width - patch_size:
         y_positions.append(width - patch_size)
 
@@ -69,19 +96,20 @@ def reassemble_patches(patches, positions, original_shape, patch_size=256):
         output[x : x + patch_size, y : y + patch_size] += patch
         count[x : x + patch_size, y : y + patch_size] += 1
 
-    # Avoid division by zero.
     count[count == 0] = 1
     output /= count
     return output
 
-# This function creates a ZIP file from a list of (PIL Image, filename) tuples.
 def create_zip_download(images_and_filenames, zip_filename="download.zip"):
+    """
+    Packages a list of (PIL Image, filename) tuples into a ZIP archive and creates
+    a download button for it.
+    """
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         for img, fname in images_and_filenames:
             buffered = BytesIO()
             img.save(buffered, format="JPEG")
-            # Save the file into the zip archive.
             zf.writestr(fname, buffered.getvalue())
     zip_buffer.seek(0)
     st.download_button(
@@ -91,9 +119,9 @@ def create_zip_download(images_and_filenames, zip_filename="download.zip"):
         mime="application/zip"
     )
 
-# ---------------------------
-# Custom Metrics and Loss Functions (unchanged)
-# ---------------------------
+# ------------------------------------------------------
+# 3. Custom Metrics and Loss Functions 
+# ------------------------------------------------------
 def dice_coefficient(y_true, y_pred):
     y_true_f = tf.reshape(y_true, [-1])
     y_pred_f = tf.reshape(y_pred, [-1])
@@ -131,9 +159,9 @@ def weighted_binary_crossentropy(weights):
 
 weighted_loss = weighted_binary_crossentropy([0.5355597809300489, 7.530414514976497])
 
-# ---------------------------
-# Model Loading (using st.cache_resource instead of st.cache)
-# ---------------------------
+# ------------------------------------------------------
+# 4. Model Loading (Using st.cache_resource)
+# ------------------------------------------------------
 gdrive_url = 'https://drive.google.com/uc?export=download&id=1MB7DOQq6--oIYF6TWdn7kisjXWnPI1E4'
 model_file = '/mount/src/building_footprint_extraction/unet_vgg_14.keras'
 
@@ -155,9 +183,9 @@ def load_model():
 
 model = load_model()
 
-# ---------------------------
-# Session State Setup
-# ---------------------------
+# ------------------------------------------------------
+# 5. Session State Setup
+# ------------------------------------------------------
 if 'raw_predictions' not in st.session_state:
     st.session_state.raw_predictions = []
 if 'original_images' not in st.session_state:
@@ -165,74 +193,80 @@ if 'original_images' not in st.session_state:
 if 'image_filenames' not in st.session_state:
     st.session_state.image_filenames = []
 
-# ---------------------------
-# App Title and Description
-# ---------------------------
+# ------------------------------------------------------
+# 6. Sidebar Configuration
+# ------------------------------------------------------
+st.sidebar.header("Configuration Options")
+
+# File uploader in the sidebar
+uploaded_files = st.sidebar.file_uploader(
+    "Choose image(s)", 
+    type=["jpg", "png", "tiff"], 
+    accept_multiple_files=True
+)
+
+# Post-processing settings moved to the sidebar
+threshold_value = st.sidebar.slider("Select Threshold Value:", 0.0, 0.99, 0.5)
+overlay_option = st.sidebar.checkbox("Create Overlay Imagery?")
+
+# ------------------------------------------------------
+# 7. App Title and Description (Main Area)
+# ------------------------------------------------------
 st.title("Building Footprint Extractor")
 st.write("Upload Sentinel-2 imagery to extract building footprints.")
 
-# ---------------------------
-# Step 1: Image Upload
-# ---------------------------
-st.markdown("### Step 1: Upload Your Imagery")
-uploaded_files = st.file_uploader("Choose image(s)", type=["jpg", "png", "tiff"], accept_multiple_files=True)
-
-# ---------------------------
-# Step 2: Run Segmentation (once)
-# ---------------------------
+# ------------------------------------------------------
+# 8. Step 1: Run Segmentation
+# ------------------------------------------------------
 if uploaded_files:
     st.write(f"**{len(uploaded_files)} image(s) uploaded successfully!**")
     
+    # Using a spinner to indicate a long-running process.
     if st.button("Run Segmentation"):
-        st.markdown("### Running Segmentation...")
-        progress_bar = st.progress(0)
-        total_images = len(uploaded_files)
-        
-        # Clear previous session state predictions (if any)
-        st.session_state.raw_predictions = []
-        st.session_state.original_images = []
-        st.session_state.image_filenames = []
-        
-        for idx, uploaded_file in enumerate(uploaded_files):
-            image = Image.open(uploaded_file).convert("RGB")
-            image_filename = os.path.splitext(uploaded_file.name)[0]
-            image_array = np.array(image) / 255.0
-            if image_array.shape[-1] == 4:
-                image_array = image_array[..., :3]
+        with st.spinner("Running segmentation..."):
+            # Clear previous session state predictions (if any)
+            st.session_state.raw_predictions = []
+            st.session_state.original_images = []
+            st.session_state.image_filenames = []
+            
+            progress_bar = st.progress(0)
+            total_images = len(uploaded_files)
+            
+            for idx, uploaded_file in enumerate(uploaded_files):
+                image = Image.open(uploaded_file).convert("RGB")
+                image_filename = os.path.splitext(uploaded_file.name)[0]
+                image_array = np.array(image) / 255.0
+                if image_array.shape[-1] == 4:
+                    image_array = image_array[..., :3]
+                    
+                patches, positions = image_to_patches(image_array, patch_size=256, overlap=32)
+                predictions = predict_patches(model, patches)
+                full_mask = reassemble_patches(predictions, positions, image_array.shape, patch_size=256)
                 
-            patches, positions = image_to_patches(image_array, patch_size=256, overlap=32)
-            predictions = predict_patches(model, patches)  
-            full_mask = reassemble_patches(predictions, positions, image_array.shape, patch_size=256)
+                st.session_state.raw_predictions.append(full_mask)
+                st.session_state.original_images.append(image)
+                st.session_state.image_filenames.append(image_filename)
+                
+                # Display the raw prediction alongside the original.
+                prediction_image = Image.fromarray((full_mask * 255).astype(np.uint8))
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.image(image, caption="Original", use_container_width=True)
+                with col2:
+                    st.image(prediction_image, caption="Raw Prediction", use_container_width=True)
+                
+                progress_bar.progress((idx + 1) / total_images)
             
-            st.session_state.raw_predictions.append(full_mask)
-            st.session_state.original_images.append(image)
-            st.session_state.image_filenames.append(image_filename)
-            
-            # Optionally display the raw prediction
-            prediction_image = Image.fromarray((full_mask * 255).astype(np.uint8))
-            col1, col2 = st.columns(2)
-            with col1:
-                st.image(image, caption="Original", use_container_width=True)
-            with col2:
-                st.image(prediction_image, caption="Raw Prediction", use_container_width=True)
-            
-            progress_bar.progress((idx + 1) / total_images)
-        
-        st.success("Segmentation complete!")
+            st.success("Segmentation complete!")
 
-# ---------------------------
-# Step 3: Post-Processing (Interactive Refinement)
-# ---------------------------
+# ------------------------------------------------------
+# 9. Step 2: Post-Processing (Interactive Refinement)
+# ------------------------------------------------------
 if st.session_state.raw_predictions:
-    st.markdown("### Step 3: Adjust Post-Processing Settings")
+    st.markdown("### Refined Results")
     
-    # The threshold slider and overlay checkbox control post-processing.
-    threshold_value = st.slider("Select Threshold Value:", 0.0, 0.99, 0.5)
-    overlay_option = st.checkbox("Create Overlay Imagery?")
-    
-    st.markdown("#### Refined Results")
-    refined_processed_images = []  # To store (mask image, filename) tuples
-    refined_overlays = []          # To store (overlay image, filename) tuples
+    refined_processed_images = []  # (mask image, filename) tuples
+    refined_overlays = []          # (overlay image, filename) tuples
     
     for idx, (raw_mask, orig_img, image_filename) in enumerate(zip(
             st.session_state.raw_predictions,
@@ -271,9 +305,9 @@ if st.session_state.raw_predictions:
         if overlay_option and overlay_image:
             refined_overlays.append((overlay_image, f"overlay_{image_filename}.jpg"))
     
-    # ---------------------------
-    # Step 4: Download Options (ZIP file download)
-    # ---------------------------
+    # ------------------------------------------------------
+    # 10. Step 3: Download Options (ZIP File Download)
+    # ------------------------------------------------------
     st.markdown("### Download Options")
     download_choices = st.multiselect(
         "Select what you would like to download:",
