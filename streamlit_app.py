@@ -8,33 +8,39 @@ from io import BytesIO
 import zipfile
 
 # ---------------------------
-# Utility Functions (unchanged except for minor adjustments)
+# Utility Functions
 # ---------------------------
 def image_to_patches(image, patch_size=256, overlap=32):
+    """
+    Splits the input image into overlapping patches, ensuring full coverage.
+    Returns:
+      patches: A list of image patches.
+      positions: A list of (x, y) coordinates corresponding to the patch's top-left corner.
+    """
     patches = []
+    positions = []
     step = patch_size - overlap
-    x_max = image.shape[0] - patch_size
-    y_max = image.shape[1] - patch_size
+    height, width = image.shape[:2]
 
-    for x in range(0, x_max + 1, step):
-        for y in range(0, y_max + 1, step):
-            patch = image[x:x + patch_size, y:y + patch_size]
-            patches.append(patch)
+    # Compute the starting x positions.
+    x_positions = list(range(0, height - patch_size + 1, step))
+    # If the last patch does not reach the bottom, add an extra position.
+    if not x_positions or x_positions[-1] != height - patch_size:
+        x_positions.append(height - patch_size)
 
-    # Edge patches (right and bottom)
-    if x_max % step != 0:
-        for y in range(0, y_max + 1, step):
-            patch = image[x_max:x_max + patch_size, y:y + patch_size]
-            patches.append(patch)
-    if y_max % step != 0:
-        for x in range(0, x_max + 1, step):
-            patch = image[x:x + patch_size, y:y + patch_size]
-            patches.append(patch)
-    if x_max % step != 0 or y_max % step != 0:
-        patch = image[x_max:x_max + patch_size, y_max:y_max + patch_size]
-        patches.append(patch)
+    # Compute the starting y positions.
+    y_positions = list(range(0, width - patch_size + 1, step))
+    # If the last patch does not reach the right edge, add an extra position.
+    if not y_positions or y_positions[-1] != width - patch_size:
+        y_positions.append(width - patch_size)
 
-    return patches
+    # Extract patches for each combination of x and y positions.
+    for x in x_positions:
+        for y in y_positions:
+            patch = image[x : x + patch_size, y : y + patch_size]
+            patches.append(patch)
+            positions.append((x, y))
+    return patches, positions
 
 def predict_patches(model, patches):
     predictions = []
@@ -44,22 +50,29 @@ def predict_patches(model, patches):
         predictions.append(prediction.squeeze())  # Remove batch dimension
     return predictions
 
-def reassemble_patches(patches, original_shape, patch_size=256, overlap=32):
-    step = patch_size - overlap
-    image_height, image_width = original_shape[:2]
-    reassembled_image = np.zeros(original_shape[:2])
-    count = np.zeros(original_shape[:2])
+def reassemble_patches(patches, positions, original_shape, patch_size=256):
+    """
+    Reassembles a full image from its patches.
+    - patches: List of patch predictions.
+    - positions: List of (x, y) coordinates for each patch.
+    - original_shape: The shape of the original image.
+    - patch_size: The size of each patch.
+    
+    Returns:
+      A full prediction map with overlapping regions averaged.
+    """
+    height, width = original_shape[:2]
+    output = np.zeros((height, width), dtype=np.float32)
+    count = np.zeros((height, width), dtype=np.float32)
 
-    patch_idx = 0
-    for x in range(0, image_height - patch_size + 1, step):
-        for y in range(0, image_width - patch_size + 1, step):
-            reassembled_image[x:x + patch_size, y:y + patch_size] += patches[patch_idx]
-            count[x:x + patch_size, y:y + patch_size] += 1
-            patch_idx += 1
+    for patch, (x, y) in zip(patches, positions):
+        output[x : x + patch_size, y : y + patch_size] += patch
+        count[x : x + patch_size, y : y + patch_size] += 1
 
-    count[count == 0] = 1  # Avoid division by zero
-    reassembled_image /= count
-    return reassembled_image
+    # Avoid division by zero.
+    count[count == 0] = 1
+    output /= count
+    return output
 
 # This function creates a ZIP file from a list of (PIL Image, filename) tuples.
 def create_zip_download(images_and_filenames, zip_filename="download.zip"):
@@ -187,9 +200,9 @@ if uploaded_files:
             if image_array.shape[-1] == 4:
                 image_array = image_array[..., :3]
                 
-            patches = image_to_patches(image_array)
-            predictions = predict_patches(model, patches)
-            full_mask = reassemble_patches(predictions, image_array.shape)
+            patches, positions = image_to_patches(image_array, patch_size=256, overlap=32)
+            predictions = predict_patches(model, patches)  
+            full_mask = reassemble_patches(predictions, positions, image_array.shape, patch_size=256)
             
             st.session_state.raw_predictions.append(full_mask)
             st.session_state.original_images.append(image)
