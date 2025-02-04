@@ -5,9 +5,10 @@ import tensorflow as tf
 import numpy as np
 import os
 from io import BytesIO
+import zipfile
 
 # ---------------------------
-# Utility Functions (same as before)
+# Utility Functions (unchanged except for minor adjustments)
 # ---------------------------
 def image_to_patches(image, patch_size=256, overlap=32):
     patches = []
@@ -60,15 +61,21 @@ def reassemble_patches(patches, original_shape, patch_size=256, overlap=32):
     reassembled_image /= count
     return reassembled_image
 
-def get_image_download_link(img, filename, text):
-    buffered = BytesIO()
-    img.save(buffered, format="JPEG")
-    img_str = buffered.getvalue()
+# This function creates a ZIP file from a list of (PIL Image, filename) tuples.
+def create_zip_download(images_and_filenames, zip_filename="download.zip"):
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for img, fname in images_and_filenames:
+            buffered = BytesIO()
+            img.save(buffered, format="JPEG")
+            # Save the file into the zip archive.
+            zf.writestr(fname, buffered.getvalue())
+    zip_buffer.seek(0)
     st.download_button(
-        label=text,
-        data=img_str,
-        file_name=filename,
-        mime="image/jpeg"
+        label="Download ZIP",
+        data=zip_buffer,
+        file_name=zip_filename,
+        mime="application/zip"
     )
 
 # ---------------------------
@@ -112,12 +119,12 @@ def weighted_binary_crossentropy(weights):
 weighted_loss = weighted_binary_crossentropy([0.5355597809300489, 7.530414514976497])
 
 # ---------------------------
-# Model Loading (cached)
+# Model Loading (using st.cache_resource instead of st.cache)
 # ---------------------------
 gdrive_url = 'https://drive.google.com/uc?export=download&id=1MB7DOQq6--oIYF6TWdn7kisjXWnPI1E4'
 model_file = '/mount/src/building_footprint_extraction/unet_vgg_14.keras'
 
-@st.cache(allow_output_mutation=True)
+@st.cache_resource
 def load_model():
     gdown.download(gdrive_url, model_file, quiet=False)
     model = tf.keras.models.load_model(
@@ -138,7 +145,6 @@ model = load_model()
 # ---------------------------
 # Session State Setup
 # ---------------------------
-# We want to save segmentation outputs so that slider changes do not trigger re-segmentation.
 if 'raw_predictions' not in st.session_state:
     st.session_state.raw_predictions = []
 if 'original_images' not in st.session_state:
@@ -185,7 +191,6 @@ if uploaded_files:
             predictions = predict_patches(model, patches)
             full_mask = reassemble_patches(predictions, image_array.shape)
             
-            # Save the raw predictions and original image in session state.
             st.session_state.raw_predictions.append(full_mask)
             st.session_state.original_images.append(image)
             st.session_state.image_filenames.append(image_filename)
@@ -194,9 +199,9 @@ if uploaded_files:
             prediction_image = Image.fromarray((full_mask * 255).astype(np.uint8))
             col1, col2 = st.columns(2)
             with col1:
-                st.image(image, caption="Original", use_column_width=True)
+                st.image(image, caption="Original", use_container_width=True)
             with col2:
-                st.image(prediction_image, caption="Raw Prediction", use_column_width=True)
+                st.image(prediction_image, caption="Raw Prediction", use_container_width=True)
             
             progress_bar.progress((idx + 1) / total_images)
         
@@ -208,27 +213,25 @@ if uploaded_files:
 if st.session_state.raw_predictions:
     st.markdown("### Step 3: Adjust Post-Processing Settings")
     
-    # The threshold slider and overlay checkbox now control post-processing.
+    # The threshold slider and overlay checkbox control post-processing.
     threshold_value = st.slider("Select Threshold Value:", 0.0, 0.99, 0.5)
     overlay_option = st.checkbox("Create Overlay Imagery?")
     
-    # As the slider/checkbox is adjusted, update the display immediately.
     st.markdown("#### Refined Results")
-    refined_processed_images = []  # To store images for potential download
-    refined_overlays = []
+    refined_processed_images = []  # To store (mask image, filename) tuples
+    refined_overlays = []          # To store (overlay image, filename) tuples
     
     for idx, (raw_mask, orig_img, image_filename) in enumerate(zip(
             st.session_state.raw_predictions,
             st.session_state.original_images,
             st.session_state.image_filenames)):
         
-        # Apply the threshold to the raw prediction.
+        # Apply threshold to the raw prediction.
         refined_mask_array = (raw_mask > threshold_value).astype(np.uint8)
         refined_mask_image = Image.fromarray((refined_mask_array * 255).astype(np.uint8))
         
         # Create overlay if requested.
         if overlay_option:
-            # Ensure both images are RGBA for blending.
             orig_rgba = orig_img.convert("RGBA")
             mask_rgba = refined_mask_image.convert("RGBA")
             overlay_image = Image.blend(orig_rgba, mask_rgba, alpha=0.5)
@@ -239,24 +242,24 @@ if st.session_state.raw_predictions:
         if overlay_option:
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.image(orig_img, caption=f"{image_filename} - Original", use_column_width=True)
+                st.image(orig_img, caption=f"{image_filename} - Original", use_container_width=True)
             with col2:
-                st.image(refined_mask_image, caption="Thresholded Mask", use_column_width=True)
+                st.image(refined_mask_image, caption="Thresholded Mask", use_container_width=True)
             with col3:
-                st.image(overlay_image, caption="Overlay", use_column_width=True)
+                st.image(overlay_image, caption="Overlay", use_container_width=True)
         else:
             col1, col2 = st.columns(2)
             with col1:
-                st.image(orig_img, caption=f"{image_filename} - Original", use_column_width=True)
+                st.image(orig_img, caption=f"{image_filename} - Original", use_container_width=True)
             with col2:
-                st.image(refined_mask_image, caption="Thresholded Mask", use_column_width=True)
+                st.image(refined_mask_image, caption="Thresholded Mask", use_container_width=True)
         
         refined_processed_images.append((refined_mask_image, f"prediction_{image_filename}.jpg"))
         if overlay_option and overlay_image:
             refined_overlays.append((overlay_image, f"overlay_{image_filename}.jpg"))
     
     # ---------------------------
-    # Step 4: Download Options
+    # Step 4: Download Options (ZIP file download)
     # ---------------------------
     st.markdown("### Download Options")
     download_choices = st.multiselect(
@@ -265,9 +268,13 @@ if st.session_state.raw_predictions:
     )
     
     if st.button("Download Selected Files"):
+        files_to_zip = []
         if "Masks (JPG)" in download_choices:
-            for img, filename in refined_processed_images:
-                get_image_download_link(img, filename, f"Download {filename}")
+            files_to_zip.extend(refined_processed_images)
         if "Overlays (JPG)" in download_choices and overlay_option:
-            for overlay_img, filename in refined_overlays:
-                get_image_download_link(overlay_img, filename, f"Download {filename}")
+            files_to_zip.extend(refined_overlays)
+        
+        if files_to_zip:
+            create_zip_download(files_to_zip, zip_filename="refined_results.zip")
+        else:
+            st.warning("No files selected for download.")
