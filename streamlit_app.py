@@ -215,6 +215,17 @@ overlay_option = st.sidebar.checkbox("Create Overlay Imagery?")
 st.title("Building Footprint Extractor")
 st.write("Upload Sentinel-2 imagery to extract building footprints.")
 
+st.markdown(
+    """
+    **Instructions:**
+    
+    1. **Upload Imagery:** Use the file uploader in the sidebar to choose your image(s).
+    2. **Run Processing:** Click the **Run Segmentation** button to process the uploaded images.
+    3. **Adjust Results:** Use the sidebar slider to select a threshold value and the checkbox to enable overlay imagery.
+    4. **Download Results:** Once processing is complete, select the desired outputs and click the **Download Selected Files** button to download your results as a ZIP archive.
+    """
+)
+
 # ------------------------------------------------------
 # 8. Step 1: Run Segmentation
 # ------------------------------------------------------
